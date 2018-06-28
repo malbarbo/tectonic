@@ -30,12 +30,12 @@ url = "https://purl.org/net/pkgwpub/tectonic-default"
 "#;
 
 
-#[derive(Deserialize)]
+//#[derive(Deserialize)]
 pub struct PersistentConfig {
     default_bundles: Vec<BundleInfo>,
 }
 
-#[derive(Deserialize)]
+//#[derive(Deserialize)]
 pub struct BundleInfo {
     url: String,
 }
@@ -54,7 +54,8 @@ impl PersistentConfig {
             Ok(mut f) => {
                 let mut buf = Vec::<u8>::new();
                 f.read_to_end(&mut buf)?;
-                toml::from_slice(&buf)?
+                //toml::from_slice(&buf)?
+                panic!()
             },
             Err(e) => {
                 if e.kind() == IoErrorKind::NotFound {
@@ -63,7 +64,8 @@ impl PersistentConfig {
                         let mut f = File::create(&cfg_path)?;
                         write!(f, "{}", DEFAULT_CONFIG)?;
                     }
-                    toml::from_str(DEFAULT_CONFIG)?
+                    PersistentConfig::default()
+                    //toml::from_str(DEFAULT_CONFIG)?
                 } else {
                     // Uh oh, unexpected error reading the config file.
                     return Err(e.into());
@@ -105,6 +107,9 @@ impl PersistentConfig {
 
 impl Default for PersistentConfig {
     fn default() -> Self {
-        toml::from_str(DEFAULT_CONFIG).expect("un-parseable built-in default configuration (?!)")
+        PersistentConfig {
+            default_bundles: vec![BundleInfo { url: "https://purl.org/net/pkgwpub/tectonic-default".into() }]
+        }
+        //toml::from_str(DEFAULT_CONFIG).expect("un-parseable built-in default configuration (?!)")
     }
 }

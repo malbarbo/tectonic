@@ -42,7 +42,7 @@ extern crate hyper_native_tls;
 extern crate libc;
 extern crate md5;
 extern crate mkstemp;
-#[macro_use] extern crate serde_derive;
+// #[macro_use] extern crate serde_derive;
 extern crate serde;
 extern crate sha2;
 extern crate tectonic_xdv;

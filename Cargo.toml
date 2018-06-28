@@ -51,7 +51,7 @@ mkstemp-rs = "^0.0.2"
 md-5 = "^0.7"
 sha2 = "^0.7"
 serde = "^1.0"
-serde_derive = "^1.0"
+# serde_derive = "^1.0"
 tectonic_xdv = { path = "xdv", version = "0.1.9-dev" }
 termcolor = "^0.3"
 toml = "^0.4"
@@ -67,3 +67,6 @@ lazy_static = "^1.0"
 
 [package.metadata.docs.rs]
 dependencies = ["libfontconfig1-dev", "libgraphite2-dev", "libharfbuzz-dev", "libicu-dev", "zlib1g-dev"]
+
+[patch.crates-io]
+pkg-config = { git = "https://github.com/malbarbo/pkg-config-rs", branch = "allow-sys-static" }

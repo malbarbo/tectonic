@@ -266,6 +266,11 @@ fn main() {
         cppcfg.define("WORDS_BIGENDIAN", "1");
     }
 
+    if env::var("TECTONIC_STATIC") == Ok("1".to_string()) {
+        cppcfg.cpp_set_stdlib(None);
+        println!("cargo:rustc-link-lib=static=stdc++")
+    }
+
     ccfg.compile("libtectonic_c.a");
     cppcfg.compile("libtectonic_cpp.a");
 
