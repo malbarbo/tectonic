@@ -17,6 +17,8 @@ use crate::digest::{self, Digest, DigestData};
 use crate::errors::{Error, ErrorKind, Result};
 use crate::status::StatusBackend;
 
+mod download;
+pub use download::Error as DownloadError;
 pub mod filesystem;
 pub mod format_cache;
 pub mod itarbundle;

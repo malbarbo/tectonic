@@ -3,18 +3,15 @@
 // Licensed under the MIT License.
 
 use flate2::read::GzDecoder;
-use reqwest::{header::HeaderMap, Client, RedirectPolicy, Response, StatusCode};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::io::{BufRead, BufReader, Cursor, Read};
 
 use super::{Bundle, InputHandle, InputOrigin, IoProvider, OpenResult};
+use crate::io::download::{self, Client, Response, StatusCode};
 use crate::errors::{Error, ErrorKind, Result, ResultExt};
 use crate::status::StatusBackend;
 use crate::{tt_note, tt_warning};
-
-const MAX_HTTP_REDIRECTS_ALLOWED: usize = 10;
-const MAX_HTTP_ATTEMPTS: usize = 4;
 
 // A simple way to read chunks out of a big seekable byte stream. You could
 // implement this for io::File pretty trivially but that's not currently
@@ -45,12 +42,7 @@ impl RangeRead for HttpRangeReader {
 
     fn read_range(&mut self, offset: u64, length: usize) -> Result<Response> {
         let end_inclusive = offset + length as u64 - 1;
-
-        let mut headers = HeaderMap::new();
-        use headers::HeaderMapExt;
-        headers.typed_insert(headers::Range::bytes(offset..=end_inclusive).unwrap());
-
-        let res = self.client.get(&self.url).headers(headers).send()?;
+        let res = download::get_range(&mut self.client, &self.url, offset, end_inclusive)?;
 
         if res.status() != StatusCode::PARTIAL_CONTENT {
             return Err(Error::from(ErrorKind::UnexpectedHttpResponse(
@@ -162,7 +154,7 @@ impl<F: ITarIoFactory> IoProvider for ITarBundle<F> {
         let mut overall_failed = true;
         let mut any_failed = false;
 
-        for _ in 0..MAX_HTTP_ATTEMPTS {
+        for _ in 0..download::MAX_HTTP_ATTEMPTS {
             let mut stream = match self
                 .data
                 .as_mut()
@@ -218,38 +210,7 @@ impl ITarIoFactory for HttpITarIoFactory {
     fn get_index(&mut self, status: &mut dyn StatusBackend) -> Result<GzDecoder<Response>> {
         tt_note!(status, "indexing {}", self.url);
 
-        // First, we actually do a HEAD request on the URL for the data file.
-        // If it's redirected, we update our URL to follow the redirects. If
-        // we didn't do this separately, the index file would have to be the
-        // one with the redirect setup, which would be confusing and annoying.
-
-        let redirect_policy = RedirectPolicy::custom(|attempt| {
-            // In the process of resolving the file url it might be neccesary
-            // to stop at a certain level of redirection. This might be required
-            // because some hosts might redirect to a version of the url where
-            // it isn't possible to select the index file by appending .index.gz.
-            // (This mostly happens because CDNs redirect to the file hash.)
-            if attempt.previous().len() >= MAX_HTTP_REDIRECTS_ALLOWED {
-                attempt.too_many_redirects()
-            } else if let Some(segments) = attempt.url().clone().path_segments() {
-                let follow = segments
-                    .last()
-                    .map(|file| file.contains('.'))
-                    .unwrap_or(true);
-                if follow {
-                    attempt.follow()
-                } else {
-                    attempt.stop()
-                }
-            } else {
-                attempt.follow()
-            }
-        });
-        let res = Client::builder()
-            .redirect(redirect_policy)
-            .build()?
-            .head(&self.url)
-            .send()?;
+        let res = download::head(&self.url)?;
 
         if !(res.status().is_success() || res.status() == StatusCode::FOUND) {
             return Err(Error::from(ErrorKind::UnexpectedHttpResponse(
@@ -271,7 +232,7 @@ impl ITarIoFactory for HttpITarIoFactory {
         let mut index_url = self.url.clone();
         index_url.push_str(".index.gz");
 
-        let res = Client::new().get(&index_url).send()?;
+        let res = download::get(&index_url)?;
         if !res.status().is_success() {
             return Err(Error::from(ErrorKind::UnexpectedHttpResponse(
                 index_url.clone(),
